@@ -47,6 +47,12 @@ import timeit
 from datetime import datetime
 
 import numpy
+shark_installed = True
+try:
+    from shark.shark_runner import SharkInference
+except ImportError:
+    shark_installed = False
+    
 import psutil
 from benchmark_helper import (
     ConfigModifier,
@@ -914,6 +920,10 @@ def main():
     enable_onnxruntime = "onnxruntime" in args.engines
     enable_tensorflow = "tensorflow" in args.engines
     enable_shark = "shark" in args.engines
+    if enable_shark:
+        if not shark_installed:
+            enable_shark = False
+            logger.warning("Flags set shark to enabled but shark is not installed")
 
     if enable_torch2 and version.parse(torch.__version__) < version.parse("2.0.0"):
         logger.error(f"PyTorch version must be >=2.0.0 and you are using {torch.__version__}")
