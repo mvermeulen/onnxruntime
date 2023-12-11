@@ -49,7 +49,7 @@ from datetime import datetime
 import numpy
 shark_installed = True
 try:
-    from shark.shark_runner import SharkInference
+    from shark.shark_inference import SharkInference
 except ImportError:
     shark_installed = False
     
