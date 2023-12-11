@@ -441,11 +441,6 @@ def run_shark(
     verbose,
 ):
     results = []
-    if use_gpu and not torch.cuda.is_available():
-        logger.error("Please install PyTorch with Cuda, and use a machine with GPU for testing gpu performance.")
-        return results
-
-    torch.set_grad_enabled(False)
 
     for model_name in model_names:
         config = AutoConfig.from_pretrained(model_name, torchscript=torchscript, cache_dir=cache_dir)
@@ -486,7 +481,7 @@ def run_shark(
             for sequence_length in sequence_lengths:
                 if config.model_type in ["vit", "swin"]:
                     logger.info(
-                        f"Run PyTorch on {model_name} with input shape {[batch_size, 3, config.image_size, config.image_size]}"
+                        f"Run Shark on {model_name} with input shape {[batch_size, 3, config.image_size, config.image_size]}"
                     )
                     input_ids = torch.randn(
                         size=(batch_size, 3, config.image_size, config.image_size),
@@ -497,7 +492,7 @@ def run_shark(
                     if max_input_size is not None and sequence_length > max_input_size:
                         continue
 
-                    logger.info(f"Run PyTorch on {model_name} with input shape {[batch_size, sequence_length]}")
+                    logger.info(f"Run Shark on {model_name} with input shape {[batch_size, sequence_length]}")
                     input_ids = torch.randint(
                         low=0,
                         high=config.vocab_size - 1,
@@ -505,17 +500,21 @@ def run_shark(
                         dtype=torch.long,
                         device=device,
                     )
+                shark_module = SharkInference(
+                    ModuleFactory(model_name), (input_ids, ),
+                    device="gpu" if use_gpu else "cpu",
+                    jit_trace=True)
                 try:
-                    inference = (
-                        torch.jit.trace(model, input_ids) if torchscript else torch.compile(model) if torch2 else model
-                    )
-                    inference(input_ids)
+                    inference = shark_module.forward
+                    inference((input_ids, ))
 
-                    runtimes = timeit.repeat(lambda: inference(input_ids), repeat=repeat_times, number=1)  # noqa: B023
-
+                    runtimes = timeit.repeat(lambda: shark_module.forward(
+                        (input_ids, )),
+                                             repeat=repeat_times,
+                                             number=1)
                     result = {
-                        "engine": "torchscript" if torchscript else "torch2" if torch2 else "torch",
-                        "version": torch.__version__,
+                        "engine": "shark",
+                        "version": "1.0",
                         "providers": "NA",
                         "device": "cuda" if use_gpu else "cpu",
                         "optimizer": "",
