@@ -504,20 +504,13 @@ def run_shark(
                         dtype=torch.long,
                         device=device,
                     )
-                mlir_importer = SharkImporter(
-                    model,
-                    (input, ),
-                    frontend="torch",
-                    )
-                torch_mlir, func_name = mlir_importer.import_mlir(tracing_required=True)
-                
                 shark_module = SharkInference(
-                    torch_mlir, device="gpu" if use_gpu else "cpu",
-                    mlir_dialect="linalg")
+                    model,
+                    device="gpu" if use_gpu else "cpu",
+                    (input_ids,))
                 shark_module.compile()
                 try:
-                    inference = shark_module.forward
-                    inference((input_ids, ))
+                    inference = shark_module.forward((input_ids,))
 
                     runtimes = timeit.repeat(lambda: shark_module.forward(
                         (input_ids, )),
