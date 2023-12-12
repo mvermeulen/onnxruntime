@@ -504,10 +504,16 @@ def run_shark(
                         dtype=torch.long,
                         device=device,
                     )
-                shark_module = SharkInference(
+                mlir_importer = SharkImporter(
                     model,
-                    device="gpu" if use_gpu else "cpu",
-                    (input_ids,))
+                    (input_ids,),
+                    frontend="torch"
+                    )
+                torch_mlir,func_name = mlir_importer.import_mlir(tracing_required=True)
+                
+                shark_module = SharkInference(
+                    torch_mlir,
+                    device="gpu" if use_gpu else "cpu")
                 shark_module.compile()
                 try:
                     inference = shark_module.forward((input_ids,))
