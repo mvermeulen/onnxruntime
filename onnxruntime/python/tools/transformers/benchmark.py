@@ -509,7 +509,7 @@ def run_shark(
                     (input, ),
                     frontend="torch",
                     )
-                torch_mlir, func_name = mlir_importer.import_mlir(tracing_required=true)
+                torch_mlir, func_name = mlir_importer.import_mlir(tracing_required=True)
                 
                 shark_module = SharkInference(
                     torch_mlir, device="gpu" if use_gpu else "cpu",
