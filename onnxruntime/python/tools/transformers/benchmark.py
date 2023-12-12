@@ -52,6 +52,10 @@ try:
     from shark.shark_inference import SharkInference
 except ImportError:
     shark_installed = False
+try:
+    from shark.shark_importer import SharkImporter
+except ImportError:
+    shark_installed = False
     
 import psutil
 from benchmark_helper import (
@@ -500,10 +504,17 @@ def run_shark(
                         dtype=torch.long,
                         device=device,
                     )
+                mlir_importer = SharkImporter(
+                    model,
+                    (input, ),
+                    frontend="torch",
+                    )
+                torch_mlir, func_name = mlir_importer.import_mlir(tracing_required=true)
+                
                 shark_module = SharkInference(
-                    ModuleFactory(model_name), (input_ids, ),
-                    device="gpu" if use_gpu else "cpu",
-                    jit_trace=True)
+                    torch_mlir, device="gpu" if use_gpu else "cpu",
+                    mlir_dialect="linalg")
+                shark_module.compile()
                 try:
                     inference = shark_module.forward
                     inference((input_ids, ))
