@@ -528,10 +528,10 @@ def run_shark(
                             )
                         shark_module.compile()
                         inference = shark_module.forward((input_ids,))
-                        runtimes = timeit.repeat(lambda:shark_module.forward((input_ids,)),, repeat=repeat_times, number=1)
+                        runtimes = timeit.repeat(lambda:shark_module.forward((input_ids,)), repeat=repeat_times, number=1)
 
                     result = {
-                        "engine": "torchscript" if torchscript else "shark",
+                        "engine": "shark",
                         "version": "1.0",
                         "providers": "NA",
                         "device": "cuda" if use_gpu else "cpu",
@@ -973,6 +973,7 @@ def main():
                     args.cache_dir,
                     args.verbose,
                 )
+                print('results=',results)                
 
             if enable_torch:
                 results += run_pytorch(
@@ -1019,11 +1020,12 @@ def main():
                     args.batch_sizes,
                     args.sequence_lengths,
                     args.test_times,
-                    True,
+                    False,
                     False,
                     args.cache_dir,
                     args.verbose,
                 )
+                print('results=',results)
 
         if enable_tensorflow:
             results += run_tensorflow(
