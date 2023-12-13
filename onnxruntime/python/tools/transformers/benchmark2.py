@@ -315,7 +315,6 @@ def run_onnxruntime(
 
     return results
 
-
 def run_pytorch(
     use_gpu,
     model_names,
@@ -446,6 +445,8 @@ def run_shark(
 ):
     results = []
 
+    torch.set_grad_enabled(False)
+
     for model_name in model_names:
         config = AutoConfig.from_pretrained(model_name, torchscript=torchscript, cache_dir=cache_dir)
         config_modifier.modify(config)
@@ -504,26 +505,33 @@ def run_shark(
                         dtype=torch.long,
                         device=device,
                     )
-                mlir_importer = SharkImporter(
-                    torch.jit.trace(model, input_ids),
-                    (input_ids,),
-                    frontend="torchscript"
-                    )
-                torch_mlir,func_name = mlir_importer.import_mlir(tracing_required=True)
-                
-                shark_module = SharkInference(
-                    torch_mlir,
-                    device="gpu" if use_gpu else "cpu")
-                shark_module.compile()
                 try:
-                    inference = shark_module.forward((input_ids,))
+                    torch_jit = torch.jit.trace(model, input_ids)
+                    if torchscript:
+                        inference = (
+                            torch_jit
+                        )
+                        inference(input_ids)
 
-                    runtimes = timeit.repeat(lambda: shark_module.forward(
-                        (input_ids, )),
-                                             repeat=repeat_times,
-                                             number=1)
+                        runtimes = timeit.repeat(lambda: inference(input_ids), repeat=repeat_times, number=1)  # noqa: B023
+                    else:
+                        mlir_importer = SharkImporter(
+                            torch_jit,
+                            (input_ids,),
+                            frontend="torchscript"
+                            )
+                        torch_mlir,func_name = mlir_importer.import_mlir(tracing_required=True)
+
+                        shark_module = SharkInference(
+                            torch_mlir,
+                            device="gpu" if use_gpu else "cpu"
+                            )
+                        shark_module.compile()
+                        inference = shark_module.forward((input_ids,))
+                        runtimes = timeit.repeat(lambda:shark_module.forward((input_ids,)),, repeat=repeat_times, number=1)
+
                     result = {
-                        "engine": "shark",
+                        "engine": "torchscript" if torchscript else "shark",
                         "version": "1.0",
                         "providers": "NA",
                         "device": "cuda" if use_gpu else "cpu",
@@ -950,7 +958,7 @@ def main():
                 logger.warning("--input_counts is not implemented for torch or torchscript engine.")
 
             if enable_torchscript:
-                results += run_pytorch(
+                results += run_shark(
                     args.use_gpu,
                     args.models,
                     args.model_class,
@@ -1011,8 +1019,8 @@ def main():
                     args.batch_sizes,
                     args.sequence_lengths,
                     args.test_times,
-                    False,
                     True,
+                    False,
                     args.cache_dir,
                     args.verbose,
                 )
