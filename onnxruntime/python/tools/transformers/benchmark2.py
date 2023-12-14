@@ -428,6 +428,19 @@ def run_pytorch(
 
     return results
 
+class ModuleFactory(torch.nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, input_ids):
+        combine_input_dict = {
+            "input_ids": input_ids,
+            }
+        output = self.model(**combine_input_dict)
+        return output
+
+
 def run_shark(
     use_gpu,
     model_names,
@@ -515,7 +528,7 @@ def run_shark(
                         runtimes = timeit.repeat(lambda: inference(input_ids), repeat=repeat_times, number=1)  # noqa: B023
                     else:
                         mlir_importer = SharkImporter(
-                            model,
+                            ModuleFactory(model),
                             (input_ids,),
                             frontend="torch"
                             )
@@ -530,7 +543,7 @@ def run_shark(
                         runtimes = timeit.repeat(lambda:shark_module.forward((input_ids,)), repeat=repeat_times, number=1)
 
                     result = {
-                        "engine": "shark",
+                        "engine": "torchscript" if torchscript else "shark",
                         "version": "1.0",
                         "providers": "NA",
                         "device": "cuda" if use_gpu else "cpu",
@@ -551,7 +564,7 @@ def run_shark(
                 except RuntimeError as e:
                     logger.exception(e)
                     torch.cuda.empty_cache()
-
+    print('results = ',results)
     return results
 
 def run_with_tf_optimizations(do_eager_mode: bool, use_xla: bool):
