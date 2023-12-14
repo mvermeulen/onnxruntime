@@ -506,19 +506,18 @@ def run_shark(
                         device=device,
                     )
                 try:
-                    torch_jit = torch.jit.trace(model, input_ids)
                     if torchscript:
                         inference = (
-                            torch_jit
+                            torch.jit.trace(model, input_ids)                            
                         )
                         inference(input_ids)
 
                         runtimes = timeit.repeat(lambda: inference(input_ids), repeat=repeat_times, number=1)  # noqa: B023
                     else:
                         mlir_importer = SharkImporter(
-                            torch_jit,
+                            model,
                             (input_ids,),
-                            frontend="torchscript"
+                            frontend="torch"
                             )
                         torch_mlir,func_name = mlir_importer.import_mlir(tracing_required=True)
 
